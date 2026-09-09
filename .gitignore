@@ -1,0 +1,12 @@
+# Dependências do Composer (geoip2/geoip2) - cada ambiente instala as suas
+/vendor/
+
+# Nunca versionar a base de geolocalização nem chaves/segredos
+*.mmdb
+.env
+
+# Arquivos de SO/editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
