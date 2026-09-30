@@ -40,6 +40,15 @@ class provider implements
             'timelastused' => 'privacy:metadata:factor_geoip_devices:timelastused',
         ], 'privacy:metadata:factor_geoip_devices');
 
+        $collection->add_database_table('factor_geoip_lastseen', [
+            'userid' => 'privacy:metadata:factor_geoip_trusted:userid',
+            'ip' => 'privacy:metadata:factor_geoip_trusted:ip',
+            'latitude' => 'privacy:metadata:factor_geoip_trusted:latitude',
+            'longitude' => 'privacy:metadata:factor_geoip_trusted:longitude',
+            'country' => 'privacy:metadata:factor_geoip_trusted:country',
+            'timeseen' => 'privacy:metadata:factor_geoip_lastseen:timeseen',
+        ], 'privacy:metadata:factor_geoip_lastseen');
+
         return $collection;
     }
 
@@ -79,6 +88,14 @@ class provider implements
                 (object) ['devices' => array_values($devices)]
             );
         }
+
+        $lastseen = $DB->get_record('factor_geoip_lastseen', ['userid' => $user->id]);
+        if ($lastseen) {
+            writer::with_context(\context_system::instance())->export_data(
+                [get_string('pluginname', 'factor_geoip'), 'last_seen_location'],
+                $lastseen
+            );
+        }
     }
 
     public static function delete_data_for_all_users_in_context(\context $context) {
@@ -89,6 +106,7 @@ class provider implements
         $DB->delete_records('factor_geoip_trusted');
         $DB->delete_records('factor_geoip_codes');
         $DB->delete_records('factor_geoip_devices');
+        $DB->delete_records('factor_geoip_lastseen');
     }
 
     public static function delete_data_for_user(approved_contextlist $contextlist) {
@@ -97,6 +115,7 @@ class provider implements
         $DB->delete_records('factor_geoip_trusted', ['userid' => $userid]);
         $DB->delete_records('factor_geoip_codes', ['userid' => $userid]);
         $DB->delete_records('factor_geoip_devices', ['userid' => $userid]);
+        $DB->delete_records('factor_geoip_lastseen', ['userid' => $userid]);
     }
 
     public static function delete_data_for_users(\core_privacy\local\request\approved_userlist $userlist) {
@@ -105,6 +124,7 @@ class provider implements
             $DB->delete_records('factor_geoip_trusted', ['userid' => $userid]);
             $DB->delete_records('factor_geoip_codes', ['userid' => $userid]);
             $DB->delete_records('factor_geoip_devices', ['userid' => $userid]);
+            $DB->delete_records('factor_geoip_lastseen', ['userid' => $userid]);
         }
     }
 }

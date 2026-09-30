@@ -87,3 +87,121 @@ $settings->add(new admin_setting_configcheckbox(
     get_string('challengefirstlogin_desc', 'factor_geoip'),
     0
 ));
+
+// Mudança de navegador/sistema operacional num dispositivo já confiável.
+$settings->add(new admin_setting_configcheckbox(
+    'factor_geoip/checkuseragent',
+    get_string('checkuseragent', 'factor_geoip'),
+    get_string('checkuseragent_desc', 'factor_geoip'),
+    1
+));
+
+// ---- Localização: país e viagem impossível. ----
+$settings->add(new admin_setting_heading('factor_geoip/heading_location',
+    get_string('heading_location', 'factor_geoip'), ''));
+
+$settings->add(new admin_setting_configcheckbox(
+    'factor_geoip/checkcountry',
+    get_string('checkcountry', 'factor_geoip'),
+    get_string('checkcountry_desc', 'factor_geoip'),
+    1
+));
+
+$settings->add(new admin_setting_configcheckbox(
+    'factor_geoip/checktravel',
+    get_string('checktravel', 'factor_geoip'),
+    get_string('checktravel_desc', 'factor_geoip'),
+    1
+));
+
+$settings->add(new admin_setting_configtext(
+    'factor_geoip/travelmaxspeed',
+    get_string('travelmaxspeed', 'factor_geoip'),
+    get_string('travelmaxspeed_desc', 'factor_geoip'),
+    900,
+    PARAM_INT
+));
+
+// ---- VPN, proxy e Tor. ----
+$settings->add(new admin_setting_heading('factor_geoip/heading_anonymous',
+    get_string('heading_anonymous', 'factor_geoip'), ''));
+
+$settings->add(new admin_setting_configcheckbox(
+    'factor_geoip/checkanonymous',
+    get_string('checkanonymous', 'factor_geoip'),
+    get_string('checkanonymous_desc', 'factor_geoip'),
+    1
+));
+
+// Base opcional (paga) MaxMind GeoIP2 Anonymous IP, para detectar VPN e proxies.
+$settings->add(new admin_setting_configfile(
+    'factor_geoip/anonmmdbpath',
+    get_string('anonmmdbpath', 'factor_geoip'),
+    get_string('anonmmdbpath_desc', 'factor_geoip'),
+    ''
+));
+
+// ---- Senhas erradas antes do login. ----
+$settings->add(new admin_setting_heading('factor_geoip/heading_failedlogins',
+    get_string('heading_failedlogins', 'factor_geoip'), ''));
+
+$settings->add(new admin_setting_configcheckbox(
+    'factor_geoip/checkfailedlogins',
+    get_string('checkfailedlogins', 'factor_geoip'),
+    get_string('checkfailedlogins_desc', 'factor_geoip'),
+    1
+));
+
+$settings->add(new admin_setting_configtext(
+    'factor_geoip/failedloginsthreshold',
+    get_string('failedloginsthreshold', 'factor_geoip'),
+    get_string('failedloginsthreshold_desc', 'factor_geoip'),
+    3,
+    PARAM_INT
+));
+
+// ---- Horário e dia incomuns (no fuso horário do usuário). ----
+$settings->add(new admin_setting_heading('factor_geoip/heading_time',
+    get_string('heading_time', 'factor_geoip'), ''));
+
+$settings->add(new admin_setting_configcheckbox(
+    'factor_geoip/checkhours',
+    get_string('checkhours', 'factor_geoip'),
+    get_string('checkhours_desc', 'factor_geoip'),
+    1
+));
+
+$hours = [];
+for ($h = 0; $h < 24; $h++) {
+    $hours[$h] = sprintf('%02d:00', $h);
+}
+$settings->add(new admin_setting_configselect(
+    'factor_geoip/unusualhourstart',
+    get_string('unusualhourstart', 'factor_geoip'),
+    get_string('unusualhourstart_desc', 'factor_geoip'),
+    0,
+    $hours
+));
+$settings->add(new admin_setting_configselect(
+    'factor_geoip/unusualhourend',
+    get_string('unusualhourend', 'factor_geoip'),
+    get_string('unusualhourend_desc', 'factor_geoip'),
+    6,
+    $hours
+));
+
+$settings->add(new admin_setting_configmulticheckbox(
+    'factor_geoip/unusualdays',
+    get_string('unusualdays', 'factor_geoip'),
+    get_string('unusualdays_desc', 'factor_geoip'),
+    [],
+    [
+        0 => get_string('sunday', 'calendar'),
+        1 => get_string('monday', 'calendar'),
+        2 => get_string('tuesday', 'calendar'),
+        3 => get_string('wednesday', 'calendar'),
+        4 => get_string('thursday', 'calendar'),
+        5 => get_string('friday', 'calendar'),
+        6 => get_string('saturday', 'calendar'),
+    ]
+));

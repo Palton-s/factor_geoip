@@ -9,8 +9,9 @@ use tool_mfa\plugininfo\factor as factorinfo;
 
 /**
  * Fator de MFA adaptativo: só exige um código extra (por e-mail) quando o
- * login vem de um dispositivo (navegador) ainda não confiável ou de um IP
- * geograficamente muito distante da última localização confiável do usuário.
+ * login apresenta algum sinal de risco (ver risk_checker): localização
+ * distante, mudança de país, viagem impossível, VPN/proxy/Tor, senhas erradas,
+ * horário incomum, dispositivo novo ou navegador/SO diferente.
  * Logins "normais" passam direto.
  */
 class factor extends object_factor_base {
@@ -18,8 +19,8 @@ class factor extends object_factor_base {
     /** @var string chave de sessão que guarda o IP já validado nesta sessão. */
     const SESSION_KEY = 'factor_geoip_validated_ip';
 
-    /** @var string chave de sessão com os motivos do desafio atual. */
-    const REASONS_KEY = 'factor_geoip_reasons';
+    /** @var string chave de sessão com a avaliação de risco (IP avaliado e motivos). */
+    const EVAL_KEY = 'factor_geoip_eval';
 
     /**
      * Decide se este fator está satisfeito ou pendente para o usuário logado.
@@ -40,42 +41,19 @@ class factor extends object_factor_base {
             return factorinfo::STATE_PASS;
         }
 
-        $reasons = $this->get_challenge_reasons($USER, $ip);
-        if (!$reasons) {
-            // Dispositivo conhecido e localização normal: não bloqueia o login.
-            return factorinfo::STATE_PASS;
+        // Avalia uma única vez por sessão/IP: get_state é chamado várias vezes por
+        // página e algumas checagens (ex.: viagem impossível) atualizam o histórico.
+        $eval = $SESSION->{self::EVAL_KEY} ?? null;
+        if (!is_array($eval) || $eval['ip'] !== $ip) {
+            $eval = ['ip' => $ip, 'reasons' => risk_checker::evaluate($USER, $ip)];
+            $SESSION->{self::EVAL_KEY} = $eval;
         }
 
-        $SESSION->{self::REASONS_KEY} = $reasons;
-        return factorinfo::STATE_UNKNOWN;
+        return $eval['reasons'] ? factorinfo::STATE_UNKNOWN : factorinfo::STATE_PASS;
     }
 
     /**
-     * @return string[] motivos para exigir o código ('distantlocation', 'newdevice'); vazio se não precisa.
-     */
-    private function get_challenge_reasons(stdClass $user, string $ip): array {
-        $reasons = [];
-
-        $distant = $this->is_login_distant($user, $ip);
-        if ($distant) {
-            $reasons[] = 'distantlocation';
-        }
-
-        if (get_config('factor_geoip', 'checkdevice') && !device_manager::is_trusted($user->id)) {
-            $challengefirst = (bool) get_config('factor_geoip', 'challengefirstlogin');
-            if (!$distant && !$challengefirst && !device_manager::has_devices($user->id)) {
-                // Primeiro dispositivo do usuário: apenas registra como confiável.
-                device_manager::trust($user->id, $ip);
-            } else {
-                $reasons[] = 'newdevice';
-            }
-        }
-
-        return $reasons;
-    }
-
-    /**
-     * Só mostra o formulário de código quando o login vem de longe.
+     * Só mostra o formulário de código quando há algum sinal de risco.
      */
     public function has_input(): bool {
         return $this->get_state() === factorinfo::STATE_UNKNOWN;
@@ -83,7 +61,7 @@ class factor extends object_factor_base {
 
     /**
      * Este fator não tem "setup" de usuário (nada para o usuário configurar
-     * antes; ele só entra em ação reativamente quando detecta distância).
+     * antes; ele só entra em ação reativamente quando detecta risco).
      */
     public function has_setup(): bool {
         return false;
@@ -122,58 +100,6 @@ class factor extends object_factor_base {
         ];
     }
 
-    /**
-     * Verifica se o IP atual está a mais de X km da última localização
-     * confiável salva para o usuário.
-     */
-    private function is_login_distant(stdClass $user, string $ip): bool {
-        global $DB;
-
-        $current = geolocator::lookup($ip);
-        if ($current === null) {
-            // Sem dados de geolocalização (IP privado, base ausente, etc.) -> não bloqueia.
-            return false;
-        }
-
-        $trusted = $DB->get_record('factor_geoip_trusted', ['userid' => $user->id]);
-
-        if (!$trusted) {
-            if (!get_config('factor_geoip', 'challengefirstlogin')) {
-                $this->remember_location($user->id, $ip, $current);
-                return false;
-            }
-            return true;
-        }
-
-        $distancekm = (int) get_config('factor_geoip', 'distancekm') ?: 500;
-        $distance = geolocator::distance_km(
-            (float) $trusted->latitude, (float) $trusted->longitude,
-            $current['lat'], $current['lon']
-        );
-        return $distance > $distancekm;
-    }
-
-    private function remember_location(int $userid, string $ip, array $geo): void {
-        global $DB;
-
-        $record = new stdClass();
-        $record->userid = $userid;
-        $record->ip = $ip;
-        $record->latitude = $geo['lat'];
-        $record->longitude = $geo['lon'];
-        $record->country = $geo['country'];
-        $record->city = $geo['city'];
-        $record->timecreated = time();
-
-        $existing = $DB->get_record('factor_geoip_trusted', ['userid' => $userid]);
-        if ($existing) {
-            $record->id = $existing->id;
-            $DB->update_record('factor_geoip_trusted', $record);
-        } else {
-            $DB->insert_record('factor_geoip_trusted', $record);
-        }
-    }
-
     public function login_form_definition(\MoodleQuickForm $mform): \MoodleQuickForm {
         $mform->addElement('static', 'geoipinfo', '',
             get_string('checkemail_desc', 'factor_geoip', $this->get_reasons_text()));
@@ -196,12 +122,12 @@ class factor extends object_factor_base {
     }
 
     /**
-     * Texto legível com os motivos do desafio atual (ex.: "novo dispositivo").
+     * Texto legível com os motivos do desafio atual (ex.: "dispositivo novo").
      */
     private function get_reasons_text(): string {
         global $SESSION;
 
-        $reasons = $SESSION->{self::REASONS_KEY} ?? ['distantlocation'];
+        $reasons = $SESSION->{self::EVAL_KEY}['reasons'] ?? [];
         return implode('; ', array_map(fn($r) => get_string('reason_' . $r, 'factor_geoip'), $reasons));
     }
 
@@ -224,14 +150,14 @@ class factor extends object_factor_base {
         $ip = getremoteaddr();
         $geo = geolocator::lookup($ip);
         if ($geo !== null) {
-            $this->remember_location($USER->id, $ip, $geo);
+            risk_checker::remember_location($USER->id, $ip, $geo);
         }
         if (get_config('factor_geoip', 'checkdevice')) {
             device_manager::trust($USER->id, $ip);
         }
 
         $SESSION->{self::SESSION_KEY} = $ip;
-        unset($SESSION->factor_geoip_code_sent, $SESSION->{self::REASONS_KEY});
+        unset($SESSION->factor_geoip_code_sent, $SESSION->{self::EVAL_KEY});
 
         parent::post_pass_state();
     }

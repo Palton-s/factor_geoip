@@ -13,4 +13,13 @@ $tasks = [
         'dayofweek' => '*',
         'month' => '*',
     ],
+    [
+        'classname' => 'factor_geoip\task\update_tor_task',
+        'blocking' => 0,
+        'minute' => 'R',
+        'hour' => '*/6',
+        'day' => '*',
+        'dayofweek' => '*',
+        'month' => '*',
+    ],
 ];

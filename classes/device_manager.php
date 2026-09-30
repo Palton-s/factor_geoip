@@ -18,15 +18,26 @@ class device_manager {
     /** @var int só atualiza timelastused se a última atualização tiver mais que isso. */
     const LASTUSED_THROTTLE = HOURSECS;
 
+    /** @var string dispositivo confiável, mesmo navegador/SO de quando foi confiado. */
+    const STATUS_TRUSTED = 'trusted';
+
+    /** @var string dispositivo desconhecido (sem cookie, cookie inválido ou expirado). */
+    const STATUS_UNKNOWN = 'unknown';
+
+    /** @var string dispositivo confiável, mas o navegador ou o sistema operacional mudou. */
+    const STATUS_UACHANGED = 'uachanged';
+
     /**
-     * @return bool true se este navegador é um dispositivo confiável (e não expirado) do usuário.
+     * Situação deste navegador em relação aos dispositivos confiáveis do usuário.
+     *
+     * @return string uma das constantes STATUS_*.
      */
-    public static function is_trusted(int $userid): bool {
+    public static function get_status(int $userid): string {
         global $DB;
 
         $token = self::get_cookie_token();
         if ($token === null) {
-            return false;
+            return self::STATUS_UNKNOWN;
         }
 
         $record = $DB->get_record('factor_geoip_devices', [
@@ -34,18 +45,55 @@ class device_manager {
             'tokenhash' => self::hash($token),
         ]);
         if (!$record) {
-            return false;
+            return self::STATUS_UNKNOWN;
         }
 
         if ($record->timelastused < time() - self::get_expiry()) {
             $DB->delete_records('factor_geoip_devices', ['id' => $record->id]);
-            return false;
+            return self::STATUS_UNKNOWN;
         }
 
         if ($record->timelastused < time() - self::LASTUSED_THROTTLE) {
             $DB->set_field('factor_geoip_devices', 'timelastused', time(), ['id' => $record->id]);
         }
-        return true;
+
+        if (!empty($record->useragent)
+                && self::ua_signature($record->useragent) !== self::ua_signature(self::get_useragent())) {
+            return self::STATUS_UACHANGED;
+        }
+        return self::STATUS_TRUSTED;
+    }
+
+    /**
+     * Resume o user agent em "navegador|sistema", ignorando versões (que mudam a cada atualização).
+     */
+    public static function ua_signature(string $ua): string {
+        $browsers = [
+            'Edge' => '/Edg(e|A|iOS)?\//',
+            'Opera' => '/OPR\/|Opera/',
+            'Samsung' => '/SamsungBrowser\//',
+            'Firefox' => '/Firefox\/|FxiOS\//',
+            'Chrome' => '/Chrome\/|CriOS\//',
+            'Safari' => '/Safari\//',
+        ];
+        $systems = [
+            'Windows' => '/Windows/',
+            'Android' => '/Android/',
+            'iOS' => '/iPhone|iPad|iPod/',
+            'macOS' => '/Mac OS X|Macintosh/',
+            'ChromeOS' => '/CrOS/',
+            'Linux' => '/Linux/',
+        ];
+
+        $match = function (array $patterns) use ($ua): string {
+            foreach ($patterns as $name => $pattern) {
+                if (preg_match($pattern, $ua)) {
+                    return $name;
+                }
+            }
+            return 'other';
+        };
+        return $match($browsers) . '|' . $match($systems);
     }
 
     /**
@@ -79,8 +127,11 @@ class device_manager {
         }
 
         $hash = self::hash($token);
+        $useragent = \core_text::substr(self::get_useragent(), 0, 255);
         $existing = $DB->get_record('factor_geoip_devices', ['userid' => $userid, 'tokenhash' => $hash]);
         if ($existing) {
+            // Atualiza o user agent: a nova combinação navegador/SO passa a ser a esperada.
+            $existing->useragent = $useragent;
             $existing->ip = $ip;
             $existing->timelastused = time();
             $DB->update_record('factor_geoip_devices', $existing);
@@ -90,7 +141,7 @@ class device_manager {
         $record = new \stdClass();
         $record->userid = $userid;
         $record->tokenhash = $hash;
-        $record->useragent = \core_text::substr(\core_useragent::get_user_agent_string() ?: '', 0, 255);
+        $record->useragent = $useragent;
         $record->ip = $ip;
         $record->timecreated = time();
         $record->timelastused = time();
@@ -105,6 +156,10 @@ class device_manager {
 
         $DB->delete_records_select('factor_geoip_devices', 'timelastused < :cutoff',
             ['cutoff' => time() - self::get_expiry()]);
+    }
+
+    private static function get_useragent(): string {
+        return (string) ($_SERVER['HTTP_USER_AGENT'] ?? '');
     }
 
     private static function get_expiry(): int {

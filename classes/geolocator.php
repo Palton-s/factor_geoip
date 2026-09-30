@@ -15,8 +15,44 @@ defined('MOODLE_INTERNAL') || die();
  */
 class geolocator {
 
-    /** @var \MaxMind\Db\Reader|null */
-    private static $reader = null;
+    /** @var \MaxMind\Db\Reader[] leitores abertos, por caminho do arquivo. */
+    private static $readers = [];
+
+    /** @var string[] campos da base GeoIP2 Anonymous IP que indicam VPN/proxy/Tor. */
+    const ANONYMOUS_FLAGS = [
+        'is_anonymous', 'is_anonymous_vpn', 'is_hosting_provider',
+        'is_public_proxy', 'is_residential_proxy', 'is_tor_exit_node',
+    ];
+
+    /**
+     * Consulta a base opcional MaxMind GeoIP2 Anonymous IP.
+     *
+     * @return bool true se o IP é conhecido como VPN, proxy, Tor ou hospedagem.
+     */
+    public static function is_anonymous(string $ip): bool {
+        if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            return false;
+        }
+
+        $reader = self::get_reader((string) get_config('factor_geoip', 'anonmmdbpath'));
+        if ($reader === null) {
+            return false;
+        }
+
+        try {
+            $record = $reader->get($ip);
+        } catch (\Throwable $e) {
+            debugging('factor_geoip: falha ao consultar a base de IP anônimo para ' . $ip . ': ' . $e->getMessage());
+            return false;
+        }
+
+        foreach (self::ANONYMOUS_FLAGS as $flag) {
+            if (!empty($record[$flag])) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     /**
      * @param string $ip
@@ -28,7 +64,7 @@ class geolocator {
             return null;
         }
 
-        $reader = self::get_reader();
+        $reader = self::get_reader((string) get_config('factor_geoip', 'mmdbpath'));
         if ($reader === null) {
             return null;
         }
@@ -68,14 +104,16 @@ class geolocator {
         return $earthradiuskm * $c;
     }
 
-    private static function get_reader(): ?\MaxMind\Db\Reader {
-        if (self::$reader !== null) {
-            return self::$reader;
+    private static function get_reader(string $path): ?\MaxMind\Db\Reader {
+        if ($path === '') {
+            return null;
+        }
+        if (isset(self::$readers[$path])) {
+            return self::$readers[$path];
         }
 
-        $path = get_config('factor_geoip', 'mmdbpath');
-        if (empty($path) || !is_readable($path)) {
-            debugging('factor_geoip: arquivo GeoLite2-City.mmdb não configurado ou ilegível em: ' . $path);
+        if (!is_readable($path)) {
+            debugging('factor_geoip: arquivo .mmdb ilegível em: ' . $path);
             return null;
         }
 
@@ -90,7 +128,7 @@ class geolocator {
             return null;
         }
 
-        self::$reader = new \MaxMind\Db\Reader($path);
-        return self::$reader;
+        self::$readers[$path] = new \MaxMind\Db\Reader($path);
+        return self::$readers[$path];
     }
 }

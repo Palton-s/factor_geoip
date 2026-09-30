@@ -44,5 +44,46 @@ function xmldb_factor_geoip_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026093004, 'factor', 'geoip');
     }
 
+    if ($oldversion < 2026093005) {
+        // Localização do login mais recente, para detectar viagem impossível.
+        $table = new xmldb_table('factor_geoip_lastseen');
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $table->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('ip', XMLDB_TYPE_CHAR, '45', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('latitude', XMLDB_TYPE_NUMBER, '10, 6', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('longitude', XMLDB_TYPE_NUMBER, '10, 6', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('country', XMLDB_TYPE_CHAR, '2', null, null, null, null);
+        $table->add_field('timeseen', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+        $table->add_key('userid', XMLDB_KEY_FOREIGN_UNIQUE, ['userid'], 'user', ['id']);
+
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+
+        // Padrões das novas verificações.
+        $defaults = [
+            'checkuseragent' => 1,
+            'checkcountry' => 1,
+            'checktravel' => 1,
+            'travelmaxspeed' => 900,
+            'checkanonymous' => 1,
+            'anonmmdbpath' => '',
+            'checkfailedlogins' => 1,
+            'failedloginsthreshold' => 3,
+            'checkhours' => 1,
+            'unusualhourstart' => 0,
+            'unusualhourend' => 6,
+            'unusualdays' => '',
+        ];
+        foreach ($defaults as $name => $value) {
+            if (get_config('factor_geoip', $name) === false) {
+                set_config($name, $value, 'factor_geoip');
+            }
+        }
+
+        upgrade_plugin_savepoint(true, 2026093005, 'factor', 'geoip');
+    }
+
     return true;
 }
