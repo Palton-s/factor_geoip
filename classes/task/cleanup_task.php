@@ -6,7 +6,7 @@ namespace factor_geoip\task;
 defined('MOODLE_INTERNAL') || die();
 
 /**
- * Remove códigos de verificação expirados/revogados antigos.
+ * Remove códigos de verificação antigos e dispositivos confiáveis expirados.
  */
 class cleanup_task extends \core\task\scheduled_task {
 
@@ -20,5 +20,7 @@ class cleanup_task extends \core\task\scheduled_task {
         // Mantém histórico por 1 dia após expirar/revogar, só por auditoria; depois apaga.
         $cutoff = time() - DAYSECS;
         $DB->delete_records_select('factor_geoip_codes', 'timeexpires < :cutoff', ['cutoff' => $cutoff]);
+
+        \factor_geoip\device_manager::delete_expired();
     }
 }

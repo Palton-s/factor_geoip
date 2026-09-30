@@ -7,15 +7,15 @@ defined('MOODLE_INTERNAL') || die();
 
 /**
  * Gera, envia por e-mail e valida os códigos de verificação de 6 dígitos
- * disparados quando um login vem de uma localização muito distante da
- * última localização confiável do usuário.
+ * disparados quando um login vem de um dispositivo novo ou de uma localização
+ * muito distante da última localização confiável do usuário.
  */
 class code_manager {
 
     /**
      * Revoga códigos antigos, gera um novo e envia por e-mail ao usuário.
      */
-    public static function issue(\stdClass $user, string $ip): void {
+    public static function issue(\stdClass $user, string $ip, string $reason): void {
         global $DB;
 
         // Revoga qualquer código pendente anterior deste usuário.
@@ -34,7 +34,7 @@ class code_manager {
         $record->revoked = 0;
         $DB->insert_record('factor_geoip_codes', $record);
 
-        self::send_email($user, $secret, $ip, $expiryminutes);
+        self::send_email($user, $secret, $ip, $expiryminutes, $reason);
     }
 
     /**
@@ -73,7 +73,8 @@ class code_manager {
         return str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
     }
 
-    private static function send_email(\stdClass $user, string $code, string $ip, int $expiryminutes): void {
+    private static function send_email(\stdClass $user, string $code, string $ip, int $expiryminutes,
+            string $reason): void {
         $site = get_site();
         $subject = get_string('email_subject', 'factor_geoip', $site->fullname);
 
@@ -87,6 +88,7 @@ class code_manager {
         $a->location = $location;
         $a->minutes = $expiryminutes;
         $a->fullname = fullname($user);
+        $a->reason = $reason;
 
         $messagetext = get_string('email_body', 'factor_geoip', $a);
         $messagehtml = format_text($messagetext, FORMAT_PLAIN, ['para' => false]);

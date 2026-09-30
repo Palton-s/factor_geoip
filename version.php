@@ -5,11 +5,11 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026090900;
-$plugin->requires  = 2022041900; // Moodle 4.0+
+$plugin->version   = 2026093004;
+$plugin->requires  = 2023100900; // Moodle 4.3+ (tool_mfa no core)
 $plugin->component = 'factor_geoip';
 $plugin->maturity  = MATURITY_BETA;
-$plugin->release   = '1.0.0';
+$plugin->release   = '1.1.0';
 
 // Depende do framework tool_mfa (https://moodle.org/plugins/tool_mfa).
 $plugin->dependencies = [

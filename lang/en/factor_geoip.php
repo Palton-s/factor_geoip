@@ -4,7 +4,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $string['pluginname'] = 'IP geolocation adaptive MFA';
-$string['heading_desc'] = 'Requires an emailed code when a login comes from a location far away from the user\'s last trusted location.';
+$string['heading_desc'] = 'Requires an emailed code when a login comes from a new device or from a location far away from the user\'s last trusted location.';
 
 $string['mmdbpath'] = 'GeoLite2-City.mmdb path';
 $string['mmdbpath_desc'] = 'Absolute server path to the MaxMind GeoLite2-City database file. Free download at maxmind.com/en/geolite2/signup.';
@@ -22,15 +22,17 @@ $string['challengefirstlogin'] = 'Challenge on first login';
 $string['challengefirstlogin_desc'] = 'If enabled, a user\'s very first login (with no trusted location saved yet) already requires the emailed code. If disabled, the first login simply records the trusted location.';
 
 $string['verificationcode'] = 'Verification code';
-$string['checkemail_desc'] = 'We detected a login from an unusual location. A verification code was sent to your registered email address.';
+$string['checkemail_desc'] = 'We need to confirm this login ({$a}). A verification code was sent to your registered email address.';
 $string['error:invalidcode'] = 'Invalid or expired code.';
 $string['unknownlocation'] = 'unknown location';
-$string['summarycondition'] = 'when the login comes from a location far from the usual one';
+$string['summarycondition'] = 'when the login comes from a new device or from a location far from the usual one';
 
 $string['email_subject'] = 'Login verification code - {$a}';
 $string['email_body'] = 'Hi {$a->fullname},
 
-We detected a login to your account from an unusual location:
+We detected a login to your account that needs confirmation.
+
+Reason: {$a->reason}
 
 IP: {$a->ip}
 Approximate location: {$a->location}
@@ -51,3 +53,13 @@ $string['privacy:metadata:factor_geoip_trusted:city'] = 'Approximate city of the
 $string['privacy:metadata:factor_geoip_trusted:timecreated'] = 'When the location was recorded.';
 $string['privacy:metadata:factor_geoip_codes'] = 'Emailed verification codes issued for logins from unusual locations.';
 $string['cleanuptask'] = 'Cleanup expired verification codes (geoip MFA)';
+$string['checkdevice'] = 'Check device';
+$string['checkdevice_desc'] = 'If enabled, logins from a browser/device the user has not verified before also require the emailed code. The first device of a user is trusted automatically unless "Challenge on first login" is enabled.';
+$string['deviceexpiry'] = 'Trusted device validity (days)';
+$string['deviceexpiry_desc'] = 'A trusted device that is not used for this many days must be verified again.';
+$string['reason_newdevice'] = 'login from a new device';
+$string['reason_distantlocation'] = 'login from an unusual location';
+$string['privacy:metadata:factor_geoip_devices'] = 'Browsers/devices the user has verified as trusted.';
+$string['privacy:metadata:factor_geoip_devices:tokenhash'] = 'Hash of the random token stored in the device cookie.';
+$string['privacy:metadata:factor_geoip_devices:useragent'] = 'Browser user agent when the device was trusted.';
+$string['privacy:metadata:factor_geoip_devices:timelastused'] = 'When the device was last used.';

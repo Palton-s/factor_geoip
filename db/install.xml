@@ -36,5 +36,24 @@
         <INDEX NAME="userid_revoked" UNIQUE="false" FIELDS="userid, revoked"/>
       </INDEXES>
     </TABLE>
+    <TABLE NAME="factor_geoip_devices" COMMENT="Dispositivos (navegadores) confiáveis de cada usuário">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="tokenhash" TYPE="char" LENGTH="64" NOTNULL="true" SEQUENCE="false" COMMENT="SHA-256 do token guardado no cookie"/>
+        <FIELD NAME="useragent" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="ip" TYPE="char" LENGTH="45" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="timelastused" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="userid" TYPE="foreign" FIELDS="userid" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="userid_tokenhash" UNIQUE="true" FIELDS="userid, tokenhash"/>
+        <INDEX NAME="timelastused" UNIQUE="false" FIELDS="timelastused"/>
+      </INDEXES>
+    </TABLE>
   </TABLES>
 </XMLDB>
